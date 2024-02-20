@@ -7,8 +7,6 @@ namespace SkybaseTimes
     public class SkybaseTimes : ModBehaviour
     {
         private static SkybaseTimes instance;
-        private const int EndOfTime = (int)AudioType.EndOfTime;
-        private const float DefaultVolume = 0.2f;
 
         private static SkybaseTimes Instance
         {
@@ -22,45 +20,47 @@ namespace SkybaseTimes
             }
         }
 
-        private void Awake()
-        {
-            instance = this;
-        }
-
         private void Start()
         {
-            ModHelper.Console.Log($"{nameof(SkybaseTimes)} has loaded!");
-            ReplaceInAudioManager();
-            ReplaceInAudioLibrary();
+            ModHelper.Console.WriteLine(nameof(SkybaseTimes) + " has loaded!");
+
+            LoadAudio();
+
+            ModHelper.HarmonyHelper.AddPostfix<AudioManager>(nameof(AudioManager.Awake), typeof(SkybaseTimes), nameof(ReplaceInAudioManager));
+            ModHelper.HarmonyHelper.AddPostfix<AudioLibrary>(nameof(AudioLibrary.BuildAudioEntryDictionary), typeof(SkybaseTimes), nameof(ReplaceInAudioLibrary));
         }
 
-        private static void ReplaceAudioEntry(Dictionary<int, AudioLibrary.AudioEntry> dictionary)
+        private const int EndOfTime = (int)AudioType.EndOfTime;
+        private AudioClip clip;
+
+        private void LoadAudio()
         {
-            if (dictionary.TryGetValue(EndOfTime, out var audioEntry))
-            {
-                audioEntry = new AudioLibrary.AudioEntry(AudioType.EndOfTime, GetClips(), DefaultVolume);
-            }
-            else
-            {
-                dictionary.Add(EndOfTime, new AudioLibrary.AudioEntry(AudioType.EndOfTime, GetClips(), DefaultVolume));
-            }
+            clip = GetClip();
         }
-
-        public static void ReplaceInAudioManager()
-        {
-            ReplaceAudioEntry(Instance.ModHelper.AudioManager.AudioLibraryDict);
-        }
-
-        public static void ReplaceInAudioLibrary()
-        {
-            ReplaceAudioEntry(Instance.ModHelper.AudioManager.AudioLibraryDict);
-        }
-
-        private static AudioClip[] GetClips() => new AudioClip[1] { GetClip() };
 
         private static AudioClip GetClip()
         {
-            return instance.ModHelper.Assets.GetAudio("Skybase_Times.mp3");
+            return instance?.ModHelper.Assets.GetAudio("Skybase_Times.mp3") ?? null;
+        }
+
+        private static void ReplaceAudioEntry(ref Dictionary<int, AudioLibrary.AudioEntry> dictionary)
+        {
+            if (dictionary.ContainsKey(EndOfTime))
+                dictionary[EndOfTime] = new AudioLibrary.AudioEntry(AudioType.EndOfTime, GetClips(), 0.2f);
+            else
+                dictionary.Add(EndOfTime, new AudioLibrary.AudioEntry(AudioType.EndOfTime, GetClips(), 0.2f));
+        }
+
+        private static AudioClip[] GetClips() => new[] { GetClip() };
+
+        private static void ReplaceInAudioManager(AudioManager instance)
+        {
+            ReplaceAudioEntry(ref instance._audioLibraryDict);
+        }
+
+        private static void ReplaceInAudioLibrary(ref Dictionary<int, AudioLibrary.AudioEntry> result)
+        {
+            ReplaceAudioEntry(ref result);
         }
     }
 }
